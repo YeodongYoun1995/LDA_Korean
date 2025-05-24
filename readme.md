@@ -1,6 +1,6 @@
-# 📚 LDA Topic Modeling (NumPy Only) for Korean Text
+# 📚 LDA Topic Modeling for Korean Text
 
-이 프로젝트는 **NumPy, Pandas, SciPy 등만 사용**하여 한국어 뉴스/위키 데이터를 대상으로 **LDA (Latent Dirichlet Allocation)** 를 수행하는 모듈입니다.  
+이 프로젝트는 **NumPy, Pandas, SciPy를 사용**하여 한국어 뉴스/위키 데이터를 대상으로 **LDA (Latent Dirichlet Allocation)** 를 수행하는 모듈입니다.  
 딥러닝 프레임워크 없이 순수한 Gibbs 샘플링 기반으로 구현되며, 다양한 시각화 및 Coherence Metric을 포함합니다.
 
 ## 🗂️ 디렉토리 구조
