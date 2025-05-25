@@ -1,12 +1,21 @@
 # visualization.py
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+import platform     # 시각화 시 한글깨짐 오류 해결
 import seaborn as sns
 from collections import Counter
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import os
 import math
 import pandas as pd
+
+# 한글 폰트 설정
+if platform.system() == 'Darwin':  # macOS
+    matplotlib.rc('font', family='AppleGothic')
+elif platform.system() == 'Windows':
+    matplotlib.rc('font', family='Malgun Gothic')
+matplotlib.rcParams['axes.unicode_minus'] = False  # 마이너스 깨짐 방지
 
 # 각 토픽의 상위 단어 분포를 막대그래프로 시각화
 # 각 토픽에 대해 top_n개의 단어를 확률 기준으로 시각화하여 저장
