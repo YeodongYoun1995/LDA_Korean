@@ -72,8 +72,54 @@ class LDAModel:
 
         self.train_time = time.time() - start_time
 
+    def infer_theta(self, new_documents, iterations=50):
+        new_docs = [self._tokenize(doc) for doc in new_documents]
+        D_new = len(new_docs)
+        V = len(self.V)
+        z_dn = []
+        n_dk = np.zeros((D_new, self.K), dtype=int)
+
+        for d, doc in enumerate(new_docs):
+            z_n = []
+            for w in doc:
+                if w not in self.W2ID:
+                    continue  # 훈련에 없던 단어는 스킵
+                w_id = self.W2ID[w]
+                z = random.randint(0, self.K - 1)
+                z_n.append((w_id, z))
+                n_dk[d][z] += 1
+            z_dn.append(z_n)
+
+        n_kw = self.n_kw.copy()
+        n_k = self.n_k.copy()
+
+        for _ in range(iterations):
+            for d, doc in enumerate(z_dn):
+                for i, (w_id, z) in enumerate(doc):
+                    n_dk[d][z] -= 1
+                    n_kw[z][w_id] -= 1
+                    n_k[z] -= 1
+
+                    p_z = (n_kw[:, w_id] + self.beta) * (n_dk[d] + self.alpha) / (n_k + V * self.beta)
+                    p_z = np.maximum(p_z, 0) 
+                    p_z_sum = np.sum(p_z)
+                    if p_z_sum == 0:
+                        p_z = np.ones(self.K) / self.K  # uniform distribution
+                    else:
+                        p_z /= p_z_sum
+                        
+                    new_z = np.random.choice(self.K, p=p_z)
+                    z_dn[d][i] = (w_id, new_z)
+                    n_dk[d][new_z] += 1
+                    n_kw[new_z][w_id] += 1
+                    n_k[new_z] += 1
+
+        theta = n_dk / (n_dk.sum(axis=1, keepdims=True) + 1e-12)
+        z_dn_only = [[z for (_, z) in doc] for doc in z_dn]
+        return theta, z_dn_only
+
     def print_top_words(self, top_n=10):
         for k in range(self.K):
             word_ids = np.argsort(self.n_kw[k])[::-1][:top_n]
             top_words = [self.ID2W[i] for i in word_ids]
-            print(f"[Topic {k}] {' '.join(top_words)}")
+            print(f"[Topic {k+1}] {' '.join(top_words)}")
