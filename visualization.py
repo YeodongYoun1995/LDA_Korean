@@ -4,7 +4,6 @@ import matplotlib
 import platform
 import seaborn as sns
 from collections import Counter
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import os
 import math
 import pandas as pd
@@ -66,15 +65,39 @@ def plot_topic_label_distribution(labels, topic_assignments, num_topics, save_pa
         plt.close()
 
 def plot_confusion_matrix(labels, topic_assignments, num_topics, save_path=None, prefix=""):
+    """
+    Confusion matrix를 직접 계산하고 시각화함 (sklearn 없이 구현)
+
+    Args:
+        labels (List[str]): 실제 라벨
+        topic_assignments (List[List[int]]): 문서별 토픽 할당 시퀀스
+        num_topics (int): 토픽 개수
+        save_path (str): 저장 경로
+        prefix (str): 저장 파일명 접두어
+    """
     y_true = labels
     y_pred = [Counter(topic_seq).most_common(1)[0][0] for topic_seq in topic_assignments]
-    label_set = sorted(list(set(labels)))
-    label_to_idx = {label: idx for idx, label in enumerate(label_set)}
-    y_true_idx = [label_to_idx[l] for l in y_true]
 
-    cm = confusion_matrix(y_true_idx, y_pred)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_set)
-    disp.plot(xticks_rotation=45, cmap='Blues')
+    # 정렬된 고유 라벨 목록과 매핑
+    label_set = sorted(set(y_true))
+    label_to_idx = {label: idx for idx, label in enumerate(label_set)}
+    y_true_idx = [label_to_idx[label] for label in y_true]
+
+    # confusion matrix 직접 계산
+    cm = np.zeros((len(label_set), num_topics), dtype=int)
+    for true_idx, pred_topic in zip(y_true_idx, y_pred):
+        cm[true_idx][pred_topic] += 1
+
+    # 시각화
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                xticklabels=[f"Topic {i+1}" for i in range(num_topics)],
+                yticklabels=label_set)
+    plt.xlabel("Predicted Topic")
+    plt.ylabel("True Label")
+    plt.title(f"Confusion Matrix ({prefix})" if prefix else "Confusion Matrix")
+    plt.tight_layout()
+
     if save_path:
         fname = f"confusion_matrix_{prefix}.png" if prefix else "confusion_matrix.png"
         plt.savefig(os.path.join(save_path, fname))
