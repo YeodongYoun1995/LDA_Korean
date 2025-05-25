@@ -72,14 +72,29 @@ def plot_topic_label_distribution(labels, topic_assignments, num_topics, save_pa
 
 def plot_confusion_matrix(labels, topic_assignments, num_topics, save_path=None, prefix=""):
     y_true = normalize_labels(labels)
-    y_pred = [Counter(topic_seq).most_common(1)[0][0] for topic_seq in topic_assignments]
+
+    # 빈 시퀀스 처리 (For Validation Set)
+    y_pred = []
+    for topic_seq in topic_assignments:
+        if topic_seq:
+            most_common = Counter(topic_seq).most_common(1)[0][0]
+        else:
+            most_common = -1  # 잘못된 값으로 지정 (추후 필터링)
+        y_pred.append(most_common)
+
+    # 유효한 인덱스만 필터링
+    valid_idx = [i for i, pred in enumerate(y_pred) if pred != -1]
+    y_true = [y_true[i] for i in valid_idx]
+    y_pred = [y_pred[i] for i in valid_idx]
+
     label_set = sorted(set(y_true))
-    label_set = normalize_labels(label_set)
     label_to_idx = {label: idx for idx, label in enumerate(label_set)}
     y_true_idx = [label_to_idx[label] for label in y_true]
+
     cm = np.zeros((len(label_set), num_topics), dtype=int)
     for true_idx, pred_topic in zip(y_true_idx, y_pred):
         cm[true_idx][pred_topic] += 1
+
     plt.figure(figsize=(10, 6))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                 xticklabels=[f"Topic {i+1}" for i in range(num_topics)],
