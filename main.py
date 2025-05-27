@@ -12,8 +12,6 @@ from visualization import (
     plot_topic_label_distribution,
     plot_confusion_matrix,
     compute_coherence_scores,
-    plot_label_topic_heatmap,
-    plot_label_dominant_topic_hist,
     plot_topic_convergence_log
 )
 
@@ -70,10 +68,8 @@ def main():
     print(f"[INFO] Training Coherence Scores: {coherence_scores}")
 
     print("[INFO] Validation 데이터 추론 중...")
-    val_theta, val_z_dn = lda.infer_theta(val_docs)
+    val_z_dn = lda.infer_theta(val_docs, iterations=20)
     plot_confusion_matrix(val_labels, val_z_dn, lda.num_topics, save_path=output_path, prefix="val")
-    plot_label_topic_heatmap(val_theta, val_labels, save_path=output_path)
-    plot_label_dominant_topic_hist(val_theta, val_labels, save_path=output_path)
 
 if __name__ == '__main__':
     main()

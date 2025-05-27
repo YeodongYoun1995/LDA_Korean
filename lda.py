@@ -72,51 +72,52 @@ class LDAModel:
 
         self.train_time = time.time() - start_time
 
-    def infer_theta(self, new_documents, iterations=50):
-        new_docs = [self._tokenize(doc) for doc in new_documents]
-        D_new = len(new_docs)
+    def infer_theta(self, new_documents, iterations=20):
+        new_docs_tokenized = [self._tokenize(doc) for doc in new_documents]
         V = len(self.V)
-        z_dn = []
-        n_dk = np.zeros((D_new, self.K), dtype=int)
 
-        for d, doc in enumerate(new_docs):
+        n_kw = self.n_kw
+        n_k = self.n_k
+        val_z_dn = []
+
+        for doc in new_docs_tokenized:
             z_n = []
+            n_dk = np.zeros(self.K, dtype=int)
+            word_ids = []
+
             for w in doc:
                 if w not in self.W2ID:
-                    continue  # 훈련에 없던 단어는 스킵
+                    continue
                 w_id = self.W2ID[w]
                 z = random.randint(0, self.K - 1)
-                z_n.append((w_id, z))
-                n_dk[d][z] += 1
-            z_dn.append(z_n)
+                z_n.append(z)
+                word_ids.append(w_id)
+                n_dk[z] += 1
 
-        n_kw = self.n_kw.copy()
-        n_k = self.n_k.copy()
+            if not z_n:
+                val_z_dn.append([])  # 빈 시퀀스는 빈 리스트로 추가
+                continue
 
-        for _ in range(iterations):
-            for d, doc in enumerate(z_dn):
-                for i, (w_id, z) in enumerate(doc):
-                    n_dk[d][z] -= 1
-                    n_kw[z][w_id] -= 1
-                    n_k[z] -= 1
+            for _ in range(iterations):
+                for i, z in enumerate(z_n):
+                    w_id = word_ids[i]
+                    n_dk[z] -= 1
 
-                    p_z = (n_kw[:, w_id] + self.beta) * (n_dk[d] + self.alpha) / (n_k + V * self.beta)
-                    p_z = np.maximum(p_z, 0) 
+                    p_z = (n_kw[:, w_id] + self.beta) * (n_dk + self.alpha)
+                    p_z = np.maximum(p_z, 0)
                     p_z_sum = np.sum(p_z)
                     if p_z_sum == 0:
-                        p_z = np.ones(self.K) / self.K  # uniform distribution
+                        p_z = np.ones(self.K) / self.K
                     else:
                         p_z /= p_z_sum
-                        
-                    new_z = np.random.choice(self.K, p=p_z)
-                    z_dn[d][i] = (w_id, new_z)
-                    n_dk[d][new_z] += 1
-                    n_kw[new_z][w_id] += 1
-                    n_k[new_z] += 1
 
-        theta = n_dk / (n_dk.sum(axis=1, keepdims=True) + 1e-12)
-        z_dn_only = [[z for (_, z) in doc] for doc in z_dn]
-        return theta, z_dn_only
+                    new_z = np.random.choice(self.K, p=p_z)
+                    z_n[i] = new_z
+                    n_dk[new_z] += 1
+
+            val_z_dn.append(z_n)
+
+        return val_z_dn
 
     def print_top_words(self, top_n=10):
         for k in range(self.K):

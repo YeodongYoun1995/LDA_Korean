@@ -1,3 +1,4 @@
+# visualization.py
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
@@ -16,8 +17,11 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # 한글 폰트 설정
 if platform.system() == 'Darwin':  # macOS
     matplotlib.rc('font', family='AppleGothic')
-elif platform.system() == 'Windows':
+elif platform.system() == 'Windows':  # Windows
     matplotlib.rc('font', family='Malgun Gothic')
+elif platform.system() == 'Linux':  # Linux
+    matplotlib.rc('font', family='NanumGothic')  # 혹은 'Noto Sans CJK KR', 'DejaVu Sans'
+
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 시각화용 색상 팔레트
@@ -73,7 +77,7 @@ def plot_topic_label_distribution(labels, topic_assignments, num_topics, save_pa
 def plot_confusion_matrix(labels, topic_assignments, num_topics, save_path=None, prefix=""):
     y_true = normalize_labels(labels)
 
-    # 빈 시퀀스 처리 (For Validation Set)
+    # 빈 시퀀스 처리
     y_pred = []
     for topic_seq in topic_assignments:
         if topic_seq:
@@ -91,21 +95,39 @@ def plot_confusion_matrix(labels, topic_assignments, num_topics, save_path=None,
     label_to_idx = {label: idx for idx, label in enumerate(label_set)}
     y_true_idx = [label_to_idx[label] for label in y_true]
 
-    cm = np.zeros((len(label_set), num_topics), dtype=int)
+    # 정수 카운트 생성
+    cm_counts = np.zeros((len(label_set), num_topics), dtype=int)
     for true_idx, pred_topic in zip(y_true_idx, y_pred):
-        cm[true_idx][pred_topic] += 1
+        cm_counts[true_idx][pred_topic] += 1
 
+    # 퍼센트로 변환
+    cm_percent = cm_counts / cm_counts.sum(axis=1, keepdims=True) * 100
+    cm_percent = np.nan_to_num(cm_percent)
+
+    # 시각화
     plt.figure(figsize=(10, 6))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+    sns.heatmap(cm_percent, annot=True, fmt=".1f", cmap="Blues",
                 xticklabels=[f"Topic {i+1}" for i in range(num_topics)],
                 yticklabels=label_set)
     plt.xlabel("Predicted Topic")
     plt.ylabel("True Label")
-    plt.title(f"Confusion Matrix ({prefix})" if prefix else "Confusion Matrix")
+    plt.title(f"Confusion Matrix ({prefix}) [%]" if prefix else "Confusion Matrix [%]")
     plt.tight_layout()
     if save_path:
         fname = f"confusion_matrix_{prefix}.png" if prefix else "confusion_matrix.png"
         plt.savefig(os.path.join(save_path, fname))
+
+        # JSON 저장
+        json_data = {
+            "labels": label_set,
+            "topics": [f"Topic {i+1}" for i in range(num_topics)],
+            "counts": cm_counts.tolist(),
+            "percents": cm_percent.tolist()
+        }
+        json_fname = f"confusion_matrix_{prefix}.json" if prefix else "confusion_matrix.json"
+        with open(os.path.join(save_path, json_fname), "w", encoding="utf-8") as f:
+            json.dump(json_data, f, ensure_ascii=False, indent=2)
+
     plt.close()
 
 def compute_coherence_scores(lda_model, top_n_words=10, max_pairs=30, min_df=5):
@@ -152,47 +174,6 @@ def compute_coherence_scores(lda_model, top_n_words=10, max_pairs=30, min_df=5):
         'UCI': uci,
         'PMI': pmi
     }
-
-def plot_label_topic_heatmap(val_theta, val_labels, save_path=None):
-    val_labels = normalize_labels(val_labels)
-    label_set = sorted(set(val_labels))
-    label_to_idx = {label: idx for idx, label in enumerate(label_set)}
-    K = val_theta.shape[1]
-    avg_topic_by_label = np.zeros((len(label_set), K))
-    count_by_label = np.zeros(len(label_set))
-    for theta, label in zip(val_theta, val_labels):
-        idx = label_to_idx[label]
-        avg_topic_by_label[idx] += theta
-        count_by_label[idx] += 1
-    avg_topic_by_label /= count_by_label[:, None]
-    df = pd.DataFrame(avg_topic_by_label, index=label_set, columns=[f"Topic {k+1}" for k in range(K)])
-    plt.figure(figsize=(10, 6))
-    sns.heatmap(df, annot=True, fmt=".2f", cmap="Blues")
-    plt.title("Label-wise Average Topic Distribution (Validation)")
-    plt.tight_layout()
-    if save_path:
-        plt.savefig(os.path.join(save_path, "val_label_topic_heatmap.png"))
-    plt.close()
-
-def plot_label_dominant_topic_hist(val_theta, val_labels, save_path=None):
-    val_labels = normalize_labels(val_labels)
-    label_set = sorted(set(val_labels))
-    dominant_topic_by_label = {label: [] for label in label_set}
-    for theta, label in zip(val_theta, val_labels):
-        top_topic = int(np.argmax(theta))
-        dominant_topic_by_label[label].append(top_topic)
-    for label in label_set:
-        counter = Counter(dominant_topic_by_label[label])
-        topics = [t + 1 for t in counter.keys()]
-        counts = list(counter.values())
-        plt.figure(figsize=(8, 4))
-        sns.barplot(x=topics, y=counts, palette=PALETTE[:len(topics)])
-        plt.title(f"Dominant Topic Distribution for Label: {label}")
-        plt.xlabel("Topic")
-        plt.ylabel("Count")
-        if save_path:
-            plt.savefig(os.path.join(save_path, f"val_dominant_topic_label_{label}.png"))
-        plt.close()
 
 def plot_topic_convergence_log(lda_model, save_path=None):
     if not hasattr(lda_model, "log_per_iter"):
